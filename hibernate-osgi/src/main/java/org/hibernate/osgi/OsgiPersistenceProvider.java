@@ -23,12 +23,10 @@
  */
 package org.hibernate.osgi;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import javax.persistence.EntityManagerFactory;
+import javax.persistence.PersistenceException;
 import javax.persistence.spi.PersistenceUnitInfo;
 
 import org.hibernate.boot.registry.selector.StrategyRegistrationProvider;
@@ -36,12 +34,11 @@ import org.hibernate.cfg.AvailableSettings;
 import org.hibernate.integrator.spi.Integrator;
 import org.hibernate.jpa.HibernatePersistenceProvider;
 import org.hibernate.jpa.boot.internal.EntityManagerFactoryBuilderImpl;
-import org.hibernate.jpa.boot.spi.Bootstrap;
-import org.hibernate.jpa.boot.spi.EntityManagerFactoryBuilder;
-import org.hibernate.jpa.boot.spi.IntegratorProvider;
-import org.hibernate.jpa.boot.spi.StrategyRegistrationProviderList;
-import org.hibernate.jpa.boot.spi.TypeContributorList;
+import org.hibernate.jpa.boot.internal.ParsedPersistenceXmlDescriptor;
+import org.hibernate.jpa.boot.internal.PersistenceXmlParser;
+import org.hibernate.jpa.boot.spi.*;
 import org.hibernate.metamodel.spi.TypeContributor;
+import org.jboss.logging.Logger;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleReference;
 
@@ -52,18 +49,21 @@ import org.osgi.framework.BundleReference;
  * @author Tim Ward
  */
 public class OsgiPersistenceProvider extends HibernatePersistenceProvider {
+
+    private static final Logger log = Logger.getLogger( OsgiPersistenceProvider.class );
+
 	private OsgiClassLoader osgiClassLoader;
 	private OsgiJtaPlatform osgiJtaPlatform;
 	private OsgiServiceUtil osgiServiceUtil;
-	private Bundle requestingBundle;
+	private Bundle          requestingBundle; //OsgiPersistenceProvider bundle consumer : the master persistence bundle
 
 	/**
 	 * Constructs a OsgiPersistenceProvider
 	 *
 	 * @param osgiClassLoader The ClassLoader we built from OSGi Bundles
 	 * @param osgiJtaPlatform The OSGi-specific JtaPlatform impl we built
+     * @param osgiServiceUtil
 	 * @param requestingBundle The OSGi Bundle requesting the PersistenceProvider
-	 * @param context The OSGi context
 	 */
 	public OsgiPersistenceProvider(
 			OsgiClassLoader osgiClassLoader,
@@ -85,14 +85,14 @@ public class OsgiPersistenceProvider extends HibernatePersistenceProvider {
 		final Map settings = generateSettings( properties );
 
 		// TODO: This needs tested.
-		settings.put( org.hibernate.jpa.AvailableSettings.SCANNER, new OsgiScanner( requestingBundle ) );
+        if (!settings.containsKey(org.hibernate.jpa.AvailableSettings.SCANNER))
+		    settings.put( org.hibernate.jpa.AvailableSettings.SCANNER, new OsgiScanner(requestingBundle) );
 		// TODO: This is temporary -- for PersistenceXmlParser's use of
 		// ClassLoaderServiceImpl#fromConfigSettings
-		settings.put( AvailableSettings.ENVIRONMENT_CLASSLOADER, osgiClassLoader );
+        settings.put( AvailableSettings.ENVIRONMENT_CLASSLOADER, osgiClassLoader );
+        osgiClassLoader.addBundle(requestingBundle);
 
-		osgiClassLoader.addBundle( requestingBundle );
-
-		final EntityManagerFactoryBuilder builder = getEntityManagerFactoryBuilderOrNull( persistenceUnitName, settings, osgiClassLoader );
+		final EntityManagerFactoryBuilder builder = getEntityManagerFactoryBuilderForMultipleBundleOrNull( persistenceUnitName, settings, osgiClassLoader );
 		return builder == null ? null : builder.build();
 	}
 
@@ -104,13 +104,28 @@ public class OsgiPersistenceProvider extends HibernatePersistenceProvider {
 		// OSGi ClassLoaders must implement BundleReference
 		settings.put(
 				org.hibernate.jpa.AvailableSettings.SCANNER,
-				new OsgiScanner( ( (BundleReference) info.getClassLoader() ).getBundle() )
+				new OsgiScanner(( (BundleReference) info.getClassLoader() ).getBundle())
 		);
 
 		osgiClassLoader.addClassLoader( info.getClassLoader() );
 
 		return Bootstrap.getEntityManagerFactoryBuilder( info, settings, osgiClassLoader ).build();
 	}
+
+    @Override
+    public boolean generateSchema(String persistenceUnitName, Map map) {
+        log.tracef( "Starting generateSchema for persistenceUnitName %s", persistenceUnitName );
+        final Map settings = generateSettings( map );
+        ArrayList<ClassLoader> classLoaders =  new ArrayList<ClassLoader>();classLoaders.add(osgiClassLoader);
+        settings.put( AvailableSettings.CLASSLOADERS,classLoaders);
+        final EntityManagerFactoryBuilder builder = getEntityManagerFactoryBuilderForMultipleBundleOrNull(persistenceUnitName, settings, osgiClassLoader);
+        if ( builder == null ) {
+            log.trace( "Could not obtain matching EntityManagerFactoryBuilder, returning false" );
+            return false;
+        }
+        builder.generateSchema();
+        return true;
+    }
 
 	@SuppressWarnings("unchecked")
 	private Map generateSettings(Map properties) {
@@ -151,4 +166,60 @@ public class OsgiPersistenceProvider extends HibernatePersistenceProvider {
 		
 		return settings;
 	}
+
+    protected EntityManagerFactoryBuilder getEntityManagerFactoryBuilderForMultipleBundleOrNull(String persistenceUnitName, Map properties, ClassLoader providedClassLoader) {
+        log.tracef( "Attempting to obtain correct EntityManagerFactoryBuilder for persistenceUnitName : %s", persistenceUnitName );
+
+        final Map integration = (properties == null ? Collections.emptyMap() : Collections.unmodifiableMap( properties ));
+        final List<ParsedPersistenceXmlDescriptor> units;
+        try {
+            units = PersistenceXmlParser.locatePersistenceUnits(integration);
+        }
+        catch (Exception e) {
+            log.debug( "Unable to locate persistence units", e );
+            throw new PersistenceException( "Unable to locate persistence units", e );
+        }
+
+        log.debugf( "Located and parsed %s persistence units; checking each", units.size() );
+
+        if ( persistenceUnitName == null && units.size() > 1 ) {
+            // no persistence-unit name to look for was given and we found multiple persistence-units
+            throw new PersistenceException( "No name provided and multiple persistence units found" );
+        }
+
+        ParsedPersistenceXmlDescriptor finalPersistenceUnit = null;
+        for ( ParsedPersistenceXmlDescriptor persistenceUnit : units ) {
+            log.debugf(
+                              "Checking persistence-unit [name=%s, explicit-provider=%s] against incoming persistence unit name [%s]",
+                              persistenceUnit.getName(),
+                              persistenceUnit.getProviderClassName(),
+                              persistenceUnitName
+            );
+
+            final boolean matches = persistenceUnitName == null || persistenceUnit.getName().equals( persistenceUnitName );
+            if ( !matches ) {
+                log.debug( "Excluding from consideration due to name mis-match" );
+                continue;
+            }
+
+            // See if we (Hibernate) are the persistence provider
+            if ( ! ProviderChecker.isProvider(persistenceUnit, properties) ) {
+                log.debug( "Excluding from consideration due to provider mis-match" );
+                continue;
+            }
+
+            if (finalPersistenceUnit != null) {
+                finalPersistenceUnit.addClasses(persistenceUnit.getManagedClassNames());
+            } else {
+                finalPersistenceUnit = persistenceUnit;
+            }
+        }
+
+        if (finalPersistenceUnit != null) {
+            return Bootstrap.getEntityManagerFactoryBuilder( finalPersistenceUnit, integration, providedClassLoader );
+        } else {
+            log.debug( "Found no matching persistence units" );
+            return null;
+        }
+    }
 }

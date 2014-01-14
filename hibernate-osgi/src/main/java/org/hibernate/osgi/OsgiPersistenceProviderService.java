@@ -41,7 +41,7 @@ public class OsgiPersistenceProviderService implements ServiceFactory {
 	 *
 	 * @param osgiClassLoader The OSGi-specific ClassLoader created in HibernateBundleActivator
 	 * @param osgiJtaPlatform The OSGi-specific JtaPlatform created in HibernateBundleActivator
-	 * @param context The OSGi context
+	 * @param osgiServiceUtil
 	 */
 	public OsgiPersistenceProviderService(
 			OsgiClassLoader osgiClassLoader,

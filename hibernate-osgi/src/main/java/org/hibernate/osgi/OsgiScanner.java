@@ -22,6 +22,8 @@ package org.hibernate.osgi;
 
 import org.hibernate.jpa.boot.scan.spi.AbstractScannerImpl;
 
+import org.hibernate.jpa.internal.EntityManagerMessageLogger;
+import org.jboss.logging.Logger;
 import org.osgi.framework.Bundle;
 
 /**
@@ -32,6 +34,17 @@ import org.osgi.framework.Bundle;
  * @author Tim Ward
  */
 public class OsgiScanner extends AbstractScannerImpl {
+
+    private static final EntityManagerMessageLogger log = Logger.getMessageLogger(
+                                                          EntityManagerMessageLogger.class,
+                                                          OsgiScanner.class.getName()
+    );
+
+    public void addPersistenceBundle(Bundle persistenceBundle) {
+        log.debug("Add persistence bundle " + persistenceBundle.getSymbolicName());
+        ((OsgiArchiveDescriptorFactory)super.getArchiveDescriptorFactory()).addPersistenceBundle(persistenceBundle);
+    }
+
 	/**
 	 * Constructs the scanner for finding things in a OSGi bundle
 	 *

@@ -719,7 +719,7 @@ public class EntityManagerFactoryBuilderImpl implements EntityManagerFactoryBuil
 	private ScanResult scan(BootstrapServiceRegistry bootstrapServiceRegistry) {
 		final Scanner scanner = locateOrBuildScanner( bootstrapServiceRegistry );
 		final ScanOptions scanOptions = determineScanOptions();
-
+        LOG.debug("Get scanner : " + scanner.getClass().getName() + " - " + scanner.toString());
 		return scanner.scan( persistenceUnit, scanOptions );
 	}
 

@@ -42,11 +42,17 @@ import org.hibernate.jpa.boot.spi.ClassDescriptor;
 import org.hibernate.jpa.boot.spi.MappingFileDescriptor;
 import org.hibernate.jpa.boot.spi.PackageDescriptor;
 import org.hibernate.jpa.boot.spi.PersistenceUnitDescriptor;
+import org.hibernate.jpa.internal.EntityManagerMessageLogger;
+import org.jboss.logging.Logger;
 
 /**
  * @author Steve Ebersole
  */
 public abstract class AbstractScannerImpl implements Scanner {
+    private static final EntityManagerMessageLogger LOG = Logger.getMessageLogger(
+        EntityManagerMessageLogger.class,
+        AbstractScannerImpl.class.getName()
+    );
 	private final ArchiveDescriptorFactory archiveDescriptorFactory;
 	private final Map<URL, ArchiveDescriptorInfo> archiveDescriptorCache = new HashMap<URL, ArchiveDescriptorInfo>();
 
@@ -54,7 +60,11 @@ public abstract class AbstractScannerImpl implements Scanner {
 		this.archiveDescriptorFactory = archiveDescriptorFactory;
 	}
 
-	@Override
+    public ArchiveDescriptorFactory getArchiveDescriptorFactory() {
+        return archiveDescriptorFactory;
+    }
+
+    @Override
 	public ScanResult scan(PersistenceUnitDescriptor persistenceUnit, ScanOptions scanOptions) {
 		final ResultCollector resultCollector = new ResultCollector( scanOptions );
 
@@ -91,16 +101,24 @@ public abstract class AbstractScannerImpl implements Scanner {
 	private ArchiveDescriptor buildArchiveDescriptor(URL url, boolean isRootUrl, ScanOptions scanOptions) {
 		final ArchiveDescriptor descriptor;
 		final ArchiveDescriptorInfo descriptorInfo = archiveDescriptorCache.get( url );
+
 		if ( descriptorInfo == null ) {
+            LOG.debug("First descriptor instanciation for URL " + url.toString());
 			descriptor = archiveDescriptorFactory.buildArchiveDescriptor( url );
 			archiveDescriptorCache.put(
 					url,
 					new ArchiveDescriptorInfo( descriptor, isRootUrl, scanOptions )
 			);
-		}
-		else {
-			validateReuse( descriptorInfo, isRootUrl, scanOptions );
-			descriptor = descriptorInfo.archiveDescriptor;
+		} else {
+            LOG.debug("New descriptor instantiation as the archiveDescriptorFactory may have changed in this dynamic world...");
+			//validateReuse( descriptorInfo, isRootUrl, scanOptions );
+			//descriptor = descriptorInfo.archiveDescriptor;
+            archiveDescriptorCache.remove(url);
+            descriptor = archiveDescriptorFactory.buildArchiveDescriptor( url );
+            archiveDescriptorCache.put(
+                                              url,
+                                              new ArchiveDescriptorInfo( descriptor, isRootUrl, scanOptions )
+            );
 		}
 		return descriptor;
 	}
@@ -220,7 +238,8 @@ public abstract class AbstractScannerImpl implements Scanner {
 	protected void validateReuse(ArchiveDescriptorInfo descriptor, boolean root, ScanOptions options) {
 		// is it really reasonable that a single url be processed multiple times?
 		// for now, throw an exception, mainly because I am interested in situations where this might happen
-		throw new IllegalStateException( "ArchiveDescriptor reused; can URLs be processed multiple times?" );
+        LOG.warn("ArchiveDescriptor reused : I'm really interested to know when it might happen so send me some mail (Steve Ebersole @ RedHat something)");
+		//throw new IllegalStateException( "ArchiveDescriptor reused; can URLs be processed multiple times?" );
 	}
 
 	public static class ArchiveContextImpl implements ArchiveContext {

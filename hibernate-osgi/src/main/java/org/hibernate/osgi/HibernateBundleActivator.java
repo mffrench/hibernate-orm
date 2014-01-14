@@ -32,10 +32,9 @@ import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.internal.util.ClassLoaderHelper;
 import org.hibernate.jpa.HibernatePersistenceProvider;
-import org.osgi.framework.BundleActivator;
-import org.osgi.framework.BundleContext;
-import org.osgi.framework.FrameworkUtil;
-import org.osgi.framework.ServiceRegistration;
+import org.hibernate.jpa.internal.EntityManagerMessageLogger;
+import org.jboss.logging.Logger;
+import org.osgi.framework.*;
 
 /**
  * This BundleActivator provides three different uses of Hibernate in OSGi
@@ -59,13 +58,19 @@ import org.osgi.framework.ServiceRegistration;
  * @author Tim Ward
  */
 @SuppressWarnings("UnusedDeclaration")
-public class HibernateBundleActivator implements BundleActivator {
+public class HibernateBundleActivator implements BundleActivator,HibernateOSGiService {
 	
 	private OsgiClassLoader osgiClassLoader;
 	private OsgiServiceUtil osgiServiceUtil;
-	
+
 	private ServiceRegistration<?> persistenceProviderService;
 	private ServiceRegistration<?> sessionFactoryService;
+    private ServiceRegistration<?> hibernateOSGiService;
+
+    private static final EntityManagerMessageLogger log = Logger.getMessageLogger(
+                                                                 EntityManagerMessageLogger.class,
+                                                                 HibernateOSGiService.class.getName()
+    );
 	
 	@Override
 	@SuppressWarnings("unchecked")
@@ -95,6 +100,11 @@ public class HibernateBundleActivator implements BundleActivator {
 				new OsgiSessionFactoryService( osgiClassLoader, osgiJtaPlatform, osgiServiceUtil ),
 				new Hashtable()
 		);
+        hibernateOSGiService = context.registerService(
+                HibernateOSGiService.class.getName(),
+                this,
+                null
+        );
 	}
 
 	@Override
@@ -108,7 +118,15 @@ public class HibernateBundleActivator implements BundleActivator {
 		persistenceProviderService = null;
 		sessionFactoryService.unregister();
 		sessionFactoryService = null;
+        hibernateOSGiService.unregister();
+        hibernateOSGiService = null;
 
 		ClassLoaderHelper.overridenClassLoader = null;
 	}
+
+    @Override
+    public void addPersistenceBundle(Bundle persistenceBundle) {
+        log.debug("Add persistence bundle " + persistenceBundle.getSymbolicName());
+        osgiClassLoader.addBundle(persistenceBundle);
+    }
 }

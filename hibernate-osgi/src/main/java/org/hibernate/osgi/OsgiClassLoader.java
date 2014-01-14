@@ -33,7 +33,9 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 
+import org.hibernate.jpa.internal.EntityManagerMessageLogger;
 import org.hibernate.service.spi.Stoppable;
+import org.jboss.logging.Logger;
 import org.osgi.framework.Bundle;
 
 /**
@@ -51,6 +53,11 @@ public class OsgiClassLoader extends ClassLoader implements Stoppable {
 
 	private Map<String, Class<?>> classCache = new HashMap<String, Class<?>>();
 	private Map<String, URL> resourceCache = new HashMap<String, URL>();
+
+    private static final EntityManagerMessageLogger log = Logger.getMessageLogger(
+                                                                 EntityManagerMessageLogger.class,
+                                                                 OsgiClassLoader.class.getName()
+    );
 	
 	public OsgiClassLoader() {
 		// DO NOT use ClassLoader#parent, which is typically the SystemClassLoader for most containers.  Instead,
@@ -153,10 +160,12 @@ public class OsgiClassLoader extends ClassLoader implements Stoppable {
 		final List<Enumeration<URL>> enumerations = new ArrayList<Enumeration<URL>>();
 		
 		for ( Bundle bundle : bundles ) {
+            log.debug("Try to get " + name + " from bundle " + bundle.getSymbolicName());
 			try {
 				final Enumeration<URL> resources = bundle.getResources( name );
 				if ( resources != null ) {
 					enumerations.add( resources );
+                    log.debug("Added " + name + " resources from bundle ");
 				}
 			}
 			catch ( Exception ignore ) {
@@ -214,6 +223,7 @@ public class OsgiClassLoader extends ClassLoader implements Stoppable {
 	 * @param bundle The Bundle to add
 	 */
 	public void addBundle( Bundle bundle ) {
+        log.debug("Add bundle " + bundle.getSymbolicName() + " to OsgiClassLoader " + this.toString());
 		bundles.add( bundle );
 	}
 

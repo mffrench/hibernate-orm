@@ -21,10 +21,14 @@
 package org.hibernate.osgi;
 
 import java.net.URL;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.hibernate.jpa.boot.archive.spi.ArchiveDescriptor;
 import org.hibernate.jpa.boot.archive.spi.ArchiveDescriptorFactory;
 
+import org.hibernate.jpa.internal.EntityManagerMessageLogger;
+import org.jboss.logging.Logger;
 import org.osgi.framework.Bundle;
 
 /**
@@ -34,7 +38,11 @@ import org.osgi.framework.Bundle;
  * @author Tim Ward
  */
 public class OsgiArchiveDescriptorFactory implements ArchiveDescriptorFactory {
-	private Bundle persistenceBundle;
+    private Set<Bundle> persistenceBundles = new HashSet<Bundle>();
+    private static final EntityManagerMessageLogger log = Logger.getMessageLogger(
+                                                          EntityManagerMessageLogger.class,
+                                                          OsgiArchiveDescriptorFactory.class.getName()
+    );
 
 	/**
 	 * Creates a OsgiArchiveDescriptorFactory
@@ -42,8 +50,14 @@ public class OsgiArchiveDescriptorFactory implements ArchiveDescriptorFactory {
 	 * @param persistenceBundle The OSGi bundle being scanned
 	 */
 	public OsgiArchiveDescriptorFactory(Bundle persistenceBundle) {
-		this.persistenceBundle = persistenceBundle;
+        log.debug("Constructor with persistence bundle " + persistenceBundle.getSymbolicName());
+		this.persistenceBundles.add(persistenceBundle);
 	}
+
+    public void addPersistenceBundle(Bundle persistenceBundle) {
+        log.debug("Add persistence bundle " + persistenceBundle.getSymbolicName());
+        this.persistenceBundles.add(persistenceBundle);
+    }
 
 	@Override
 	public ArchiveDescriptor buildArchiveDescriptor(URL url) {
@@ -52,7 +66,8 @@ public class OsgiArchiveDescriptorFactory implements ArchiveDescriptorFactory {
 
 	@Override
 	public ArchiveDescriptor buildArchiveDescriptor(URL url, String entry) {
-		return new OsgiArchiveDescriptor( persistenceBundle );
+        log.debug("call buildArchiveDescriptor");
+		return new OsgiArchiveDescriptor( persistenceBundles );
 	}
 
 	@Override

@@ -85,6 +85,7 @@ public class ClassLoaderServiceImpl implements ClassLoaderService {
 		if ( providedClassLoaders != null ) {
 			for ( ClassLoader classLoader : providedClassLoaders ) {
 				if ( classLoader != null ) {
+                    log.debug("Add classLoader to orderedClassLoaderSet " + " - " + classLoader.toString());
 					orderedClassLoaderSet.add( classLoader );
 				}
 			}
@@ -126,9 +127,12 @@ public class ClassLoaderServiceImpl implements ClassLoaderService {
 		final Collection<ClassLoader> classLoaders = (Collection<ClassLoader>) configValues.get( AvailableSettings.CLASSLOADERS );
 		if ( classLoaders != null ) {
 			for ( ClassLoader classLoader : classLoaders ) {
-				providedClassLoaders.add( classLoader );
+                log.debug("add classLoader " + classLoader.getClass().getName() + " - " + classLoader.toString());
+                providedClassLoaders.add( classLoader );
 			}
-		}
+		} else {
+            log.debug("No classLoader available for settings " + AvailableSettings.CLASSLOADERS);
+        }
 
 		addIfSet( providedClassLoaders, AvailableSettings.APP_CLASSLOADER, configValues );
 		addIfSet( providedClassLoaders, AvailableSettings.RESOURCES_CLASSLOADER, configValues );
@@ -150,8 +154,11 @@ public class ClassLoaderServiceImpl implements ClassLoaderService {
 	private static void addIfSet(List<ClassLoader> providedClassLoaders, String name, Map configVales) {
 		final ClassLoader providedClassLoader = (ClassLoader) configVales.get( name );
 		if ( providedClassLoader != null ) {
+            log.debug("add providedClassLoader " + providedClassLoader.getClass().getName()  + " - " + providedClassLoader.toString());
 			providedClassLoaders.add( providedClassLoader );
-		}
+		} else {
+            log.debug("No classLoader available for settings " + name);
+        }
 	}
 
 	private static ClassLoader locateSystemClassLoader() {
@@ -185,9 +192,13 @@ public class ClassLoaderServiceImpl implements ClassLoaderService {
 			final HashSet<URL> resourceUrls = new HashSet<URL>();
 
 			for ( ClassLoader classLoader : individualClassLoaders ) {
+                log.debug("Try to get " + name + " from classLoader " + classLoader.getClass().getName() + " - " + classLoader.toString());
 				final Enumeration<URL> urls = classLoader.getResources( name );
 				while ( urls.hasMoreElements() ) {
-					resourceUrls.add( urls.nextElement() );
+                    log.debug("Find " + name + " from classLoader " + classLoader.getClass().getName() + " - " + classLoader.toString());
+                    URL next = urls.nextElement();
+					resourceUrls.add( next );
+                    log.debug("Added " + next + " to resourceUrls...");
 				}
 			}
 
