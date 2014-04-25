@@ -82,11 +82,13 @@ public class OsgiSessionFactoryService implements ServiceFactory {
 
 	@Override
 	public Object getService(Bundle requestingBundle, ServiceRegistration registration) {
+        if (requestingBundle.getSymbolicName().equals("org.eclipse.virgo.shell.command"))
+            return null;
+
 		osgiClassLoader.addBundle( requestingBundle );
 
 		final Configuration configuration = new Configuration();
 		configuration.getProperties().put( AvailableSettings.JTA_PLATFORM, osgiJtaPlatform );
-		
 		// Allow bundles to put the config file somewhere other than the root level.
 		final BundleWiring bundleWiring = (BundleWiring) requestingBundle.adapt( BundleWiring.class );
 		final Collection<String> cfgResources = bundleWiring.listResources( "/", "hibernate.cfg.xml",

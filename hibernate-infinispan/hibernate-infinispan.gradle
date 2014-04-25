@@ -4,6 +4,7 @@ configurations {
 
 dependencies {
     compile project( ':hibernate-core' )
+    compile project( ':hibernate-osgi' )
     compile( libraries.infinispan )
     compile( libraries.rhq )
 

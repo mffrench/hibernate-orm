@@ -49,7 +49,7 @@ public class HibernateTransactionManagerLookup implements org.infinispan.transac
 
 	@Override
 	public TransactionManager getTransactionManager() throws Exception {
-		return jtaPlatform == null ? null : jtaPlatform.retrieveTransactionManager();
+        return jtaPlatform == null ? null : jtaPlatform.retrieveTransactionManager();
 	}
 
 }

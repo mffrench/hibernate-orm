@@ -38,6 +38,7 @@ import org.hibernate.cfg.Settings;
 import org.hibernate.internal.util.ClassLoaderHelper;
 import org.hibernate.internal.util.config.ConfigurationHelper;
 
+import org.hibernate.osgi.OsgiClassLoader;
 import org.infinispan.AdvancedCache;
 import org.infinispan.commands.module.ModuleCommandFactory;
 import org.infinispan.commons.util.FileLookupFactory;
@@ -400,8 +401,13 @@ public class InfinispanRegionFactory implements RegionFactory {
 			final String configLoc = ConfigurationHelper.getString(
 					INFINISPAN_CONFIG_RESOURCE_PROP, properties, DEF_INFINISPAN_CONFIG_RESOURCE
 			);
-			ClassLoader classLoader = ClassLoaderHelper.getContextClassLoader();
-			InputStream is;
+            ClassLoader classLoader = ClassLoaderHelper.getContextClassLoader();
+            if (classLoader instanceof OsgiClassLoader) {
+                ((OsgiClassLoader)classLoader).addClassLoader(this.getClass().getClassLoader());
+            }
+
+
+            InputStream is;
 			try {
 				is = FileLookupFactory.newInstance().lookupFileStrict( configLoc, classLoader );
 			}
@@ -612,15 +618,15 @@ public class InfinispanRegionFactory implements RegionFactory {
 			if ( GenericTransactionManagerLookup.class.getName().equals( ispnTmLookupClassName ) ) {
 				log.debug(
 						"Using default Infinispan transaction manager lookup " +
-								"instance (GenericTransactionManagerLookup), overriding it " +
-								"with Hibernate transaction manager lookup"
+						"instance (GenericTransactionManagerLookup), overriding it " +
+						"with Hibernate transaction manager lookup"
 				);
 				builder.transaction().transactionManagerLookup( transactionManagerlookup );
 			}
 			else if ( ispnTmLookupClassName != null && !ispnTmLookupClassName.equals( hbTmLookupClassName ) ) {
 				log.debug(
 						"Infinispan is configured [" + ispnTmLookupClassName + "] with a different transaction manager lookup " +
-								"class than Hibernate [" + hbTmLookupClassName + "]"
+						"class than Hibernate [" + hbTmLookupClassName + "]"
 				);
 			}
 			else {

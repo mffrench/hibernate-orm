@@ -81,7 +81,7 @@ public class HibernateBundleActivator implements BundleActivator,HibernateOSGiSe
 		osgiClassLoader.addBundle( FrameworkUtil.getBundle( Session.class ) );
 		osgiClassLoader.addBundle( FrameworkUtil.getBundle( HibernatePersistenceProvider.class ) );
 		ClassLoaderHelper.overridenClassLoader = osgiClassLoader;
-		
+
 		osgiServiceUtil = new OsgiServiceUtil( context );
 
 		// Build a JtaPlatform specific for this OSGi context
