@@ -82,7 +82,7 @@ public class OsgiSessionFactoryService implements ServiceFactory {
 
 	@Override
 	public Object getService(Bundle requestingBundle, ServiceRegistration registration) {
-        if (requestingBundle.getSymbolicName().equals("org.eclipse.virgo.shell.command"))
+        if (requestingBundle.getSymbolicName().equals("net.echinopsii.3rdparty.org.eclipse.virgo.shell.command"))
             return null;
 
 		osgiClassLoader.addBundle( requestingBundle );
